@@ -1,4 +1,6 @@
 use clap::Parser;
+use std::fs;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -11,9 +13,20 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    println!("Paths: {:?}", args.paths);
 
     for path in args.paths {
-        println!("Path: {:?}", path);
+        match fs::metadata(&path) {
+            Ok(_) => {
+                // Path exists, add moving to trash logic here
+                println!("Path exists {:?}", path);
+            }
+            Err(error) => {
+                if error.kind() == ErrorKind::NotFound {
+                    eprintln!("Error: Path not found: {:?}", path);
+                } else {
+                    eprintln!("Error: {:?}", error);
+                }
+            }
+        }
     }
 }
