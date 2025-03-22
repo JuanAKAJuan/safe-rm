@@ -12,6 +12,9 @@ struct Args {
 
     #[clap(short = 'r', long = "recursive")]
     recursive: bool,
+
+    #[clap(short = 'f', long = "force")]
+    force: bool,
 }
 
 fn main() {
