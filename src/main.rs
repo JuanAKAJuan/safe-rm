@@ -15,6 +15,9 @@ struct Args {
 
     #[clap(short = 'f', long = "force")]
     force: bool,
+
+    #[clap(short = 'v', long = "verbose", help = "Enable verbose output")]
+    verbose: bool,
 }
 
 fn main() {
@@ -31,8 +34,12 @@ fn main() {
                     continue;
                 }
 
-                match move_to_trash(path, args.recursive, args.force) {
-                    Ok(_) => println!("Moved to trash: {}", path.display()),
+                match move_to_trash(path, args.recursive, args.force, args.verbose) {
+                    Ok(_) => {
+                        if args.verbose {
+                            println!("Moved to trash: {}", path.display())
+                        }
+                    }
                     Err(error) => eprintln!("Error moving to trash: {}: {}", path.display(), error),
                 }
             }
@@ -52,7 +59,12 @@ fn main() {
     }
 }
 
-fn move_to_trash(path: &PathBuf, recursive: bool, force: bool) -> std::io::Result<()> {
+fn move_to_trash(
+    path: &PathBuf,
+    recursive: bool,
+    force: bool,
+    verbose: bool,
+) -> std::io::Result<()> {
     let metadata = match fs::metadata(path) {
         Ok(meta) => meta,
         Err(error) => {
@@ -76,26 +88,45 @@ fn move_to_trash(path: &PathBuf, recursive: bool, force: bool) -> std::io::Resul
         // For now, this is just simulating moving to trash.
         // I will use `trash` to properly move the directory and its contents to the
         // trash.
-        println!("Would recursively move to trash: {}", path.display());
+        if verbose {
+            println!("Recursively moved to trash: {}", path.display());
+        }
 
         // List directory contents for demonstration
-        for entry in fs::read_dir(path)? {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(error) => {
-                    if force {
-                        continue;
-                    } else {
-                        return Err(error);
+        if verbose {
+            for entry in fs::read_dir(path)? {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(error) => {
+                        if force {
+                            continue;
+                        } else {
+                            return Err(error);
+                        }
                     }
-                }
-            };
-            println!("  Would move: {}", entry.path().display());
+                };
+
+                let metadata = entry.metadata()?;
+                let file_type = if metadata.is_dir() {
+                    "directory"
+                } else {
+                    "file"
+                };
+
+                println!("  Trashed: {} ({})", entry.path().display(), file_type);
+            }
         }
     } else {
         // In normal `rm -r`, not specifying a directory and only a file will still delete
         // that file.
-        println!("Would move file to trash: {}", path.display());
+        if verbose {
+            let file_size = metadata.len();
+            println!(
+                "Moved file to trash: {} (size: {} bytes)",
+                path.display(),
+                file_size
+            );
+        }
     }
 
     Ok(())
