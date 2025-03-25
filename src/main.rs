@@ -28,19 +28,17 @@ fn main() {
             Ok(metadata) => {
                 if metadata.is_dir() && !args.recursive {
                     eprintln!(
-                        "Error: Cannot remove directory '{}' without -r flag",
+                        "Cannot remove directory '{}' without -r flag",
                         path.display()
                     );
                     continue;
                 }
 
                 match move_to_trash(path, args.recursive, args.force, args.verbose) {
-                    Ok(_) => {
-                        if args.verbose {
-                            println!("Moved to trash: {}", path.display())
-                        }
+                    Ok(_) => {}
+                    Err(error) => {
+                        eprintln!("Error moving to trash: '{}': {}", path.display(), error)
                     }
-                    Err(error) => eprintln!("Error moving to trash: {}: {}", path.display(), error),
                 }
             }
             Err(error) => {
@@ -49,10 +47,10 @@ fn main() {
                         // With the force flag, silently ignore non-existent files.
                         continue;
                     } else {
-                        eprintln!("Error: Path not found: {}", path.display());
+                        eprintln!("Path not found: '{}'", path.display());
                     }
                 } else {
-                    eprintln!("Error: {}: {}", path.display(), error);
+                    eprintln!("Error: '{}': {}", path.display(), error);
                 }
             }
         }
@@ -83,32 +81,61 @@ fn move_to_trash(
         ));
     }
 
+    let directory_entries = if verbose && metadata.is_dir() {
+        let mut entries: Vec<(PathBuf, String)> = Vec::new();
+        if let Ok(read_directory) = fs::read_dir(path) {
+            for entry_result in read_directory {
+                match entry_result {
+                    Ok(entry) => {
+                        if let Ok(metadata) = entry.metadata() {
+                            let file_type = if metadata.is_dir() {
+                                "directory"
+                            } else {
+                                "file"
+                            };
+                            entries.push((entry.path(), file_type.to_string()));
+                        }
+                    }
+                    Err(_) if force => continue,
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Some(entries)
+    } else {
+        None
+    };
+
     match trash::delete(path) {
         Ok(_) => {
             if verbose {
                 if metadata.is_dir() {
-                    println!("Recursively moved to trash: {}", path.display());
+                    println!("Moved directory to trash: '{}'", path.display());
 
-                    if let Ok(entries) = fs::read_dir(path) {
+                    if let Some(entries) = directory_entries {
+                        for (entry_path, file_type) in entries {
+                            println!("  Trashed: '{}' ({})", entry_path.display(), file_type);
+                        }
                     }
+                } else {
+                    // In normal `rm -r`, not specifying a directory and only a file will still delete
+                    // that file.
+                    let file_size = metadata.len();
+                    println!(
+                        "Moved file to trash: '{}' (size: {} bytes)",
+                        path.display(),
+                        file_size
+                    );
                 }
             }
-            
+            Ok(())
         }
         Err(error) => {
-        }
-
-        }
-    } else {
-        // In normal `rm -r`, not specifying a directory and only a file will still delete
-        // that file.
-        if verbose {
-            let file_size = metadata.len();
-            println!(
-                "Moved file to trash: {} (size: {} bytes)",
-                path.display(),
-                file_size
-            );
+            // Convert the trash crate error to an io::Error
+            Err(std::io::Error::new(
+                ErrorKind::Other,
+                format!("Failed to move to trash: '{}'", error),
+            ))
         }
     }
 }
