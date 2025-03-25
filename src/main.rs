@@ -31,14 +31,19 @@ fn main() {
                     continue;
                 }
 
-                match move_to_trash(path, args.recursive) {
+                match move_to_trash(path, args.recursive, args.force) {
                     Ok(_) => println!("Moved to trash: {}", path.display()),
                     Err(error) => eprintln!("Error moving to trash: {}: {}", path.display(), error),
                 }
             }
             Err(error) => {
                 if error.kind() == ErrorKind::NotFound {
-                    eprintln!("Error: Path not found: {}", path.display());
+                    if args.force {
+                        // With the force flag, silently ignore non-existent files.
+                        continue;
+                    } else {
+                        eprintln!("Error: Path not found: {}", path.display());
+                    }
                 } else {
                     eprintln!("Error: {}: {}", path.display(), error);
                 }
@@ -47,8 +52,17 @@ fn main() {
     }
 }
 
-fn move_to_trash(path: &PathBuf, recursive: bool) -> std::io::Result<()> {
-    let metadata = fs::metadata(path)?;
+fn move_to_trash(path: &PathBuf, recursive: bool, force: bool) -> std::io::Result<()> {
+    let metadata = match fs::metadata(path) {
+        Ok(meta) => meta,
+        Err(error) => {
+            // When using -f (force), it's okay if the file is not found
+            if force && error.kind() == ErrorKind::NotFound {
+                return Ok(());
+            }
+            return Err(error);
+        }
+    };
 
     if metadata.is_dir() {
         if !recursive {
@@ -66,7 +80,16 @@ fn move_to_trash(path: &PathBuf, recursive: bool) -> std::io::Result<()> {
 
         // List directory contents for demonstration
         for entry in fs::read_dir(path)? {
-            let entry = entry?;
+            let entry = match entry {
+                Ok(e) => e,
+                Err(error) => {
+                    if force {
+                        continue;
+                    } else {
+                        return Err(error);
+                    }
+                }
+            };
             println!("  Would move: {}", entry.path().display());
         }
     } else {
