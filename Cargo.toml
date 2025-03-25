@@ -5,6 +5,10 @@ edition = "2024"
 description = "A safer alternative to rm that moves files to trash"
 authors = ["Juan Mireles"]
 
+[[bin]]
+name = "srm"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
 directories = "6.0.0"
