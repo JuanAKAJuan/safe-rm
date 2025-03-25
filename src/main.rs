@@ -37,7 +37,11 @@ fn main() {
                 match move_to_trash(path, args.recursive, args.force, args.verbose) {
                     Ok(_) => {}
                     Err(error) => {
-                        eprintln!("Error moving to trash: '{}': {}", path.display(), error)
+                        if error.kind() == ErrorKind::PermissionDenied {
+                            eprintln!("Permission denied: '{}': {}", path.display(), error);
+                        } else {
+                            eprintln!("Error moving to trash: '{}': {}", path.display(), error)
+                        }
                     }
                 }
             }
@@ -70,6 +74,14 @@ fn move_to_trash(
             if force && error.kind() == ErrorKind::NotFound {
                 return Ok(());
             }
+
+            if error.kind() == ErrorKind::PermissionDenied {
+                return Err(std::io::Error::new(
+                    ErrorKind::PermissionDenied,
+                    format!("Permission denied: cannot access '{}'", path.display()),
+                ));
+            }
+
             return Err(error);
         }
     };
