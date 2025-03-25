@@ -76,45 +76,28 @@ fn move_to_trash(
         }
     };
 
-    if metadata.is_dir() {
-        if !recursive {
-            return Err(std::io::Error::new(
-                ErrorKind::PermissionDenied,
-                "Cannot remove directory without -r flag",
-            ));
-        }
+    if metadata.is_dir() && !recursive {
+        return Err(std::io::Error::new(
+            ErrorKind::PermissionDenied,
+            "Cannot remove directory without -r flag",
+        ));
+    }
 
-        // TODO: Implement basic file/directory moving to trash.
-        // For now, this is just simulating moving to trash.
-        // I will use `trash` to properly move the directory and its contents to the
-        // trash.
-        if verbose {
-            println!("Recursively moved to trash: {}", path.display());
-        }
+    match trash::delete(path) {
+        Ok(_) => {
+            if verbose {
+                if metadata.is_dir() {
+                    println!("Recursively moved to trash: {}", path.display());
 
-        // List directory contents for demonstration
-        if verbose {
-            for entry in fs::read_dir(path)? {
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(error) => {
-                        if force {
-                            continue;
-                        } else {
-                            return Err(error);
-                        }
+                    if let Ok(entries) = fs::read_dir(path) {
                     }
-                };
-
-                let metadata = entry.metadata()?;
-                let file_type = if metadata.is_dir() {
-                    "directory"
-                } else {
-                    "file"
-                };
-
-                println!("  Trashed: {} ({})", entry.path().display(), file_type);
+                }
             }
+            
+        }
+        Err(error) => {
+        }
+
         }
     } else {
         // In normal `rm -r`, not specifying a directory and only a file will still delete
@@ -128,6 +111,4 @@ fn move_to_trash(
             );
         }
     }
-
-    Ok(())
 }

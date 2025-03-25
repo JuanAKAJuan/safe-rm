@@ -2,6 +2,8 @@
 name = "safe-rm"
 version = "0.1.0"
 edition = "2024"
+description = "A safer alternative to rm that moves files to trash"
+authors = ["Juan Mireles"]
 
 [dependencies]
 clap = { version = "4.5.32", features = ["derive"] }
